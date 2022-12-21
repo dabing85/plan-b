@@ -1,6 +1,7 @@
 package com.dabing.planabc.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.dabing.planabc.dto.LoginFormDTO;
 import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.User;
 
@@ -14,4 +15,6 @@ import javax.servlet.http.HttpSession;
 public interface UserService extends IService<User> {
 
     Result sendCode(String phone, HttpSession session);
+
+    Result login(LoginFormDTO loginFormDto, HttpSession session);
 }

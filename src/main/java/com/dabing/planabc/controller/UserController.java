@@ -1,8 +1,10 @@
 package com.dabing.planabc.controller;
 
+import com.dabing.planabc.dto.LoginFormDTO;
 import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.service.UserService;
 import com.dabing.planabc.utils.RegexUtils;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,5 +21,10 @@ public class UserController {
     @RequestMapping("/code")
     public Result sendCode(@RequestParam(value = "phone" )String phone, HttpSession session){
         return userService.sendCode(phone,session);
+    }
+
+    @RequestMapping("/login")
+    public Result login(@RequestBody LoginFormDTO loginFormDto,HttpSession session){
+        return userService.login(loginFormDto,session);
     }
 }
