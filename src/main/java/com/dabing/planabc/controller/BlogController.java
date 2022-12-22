@@ -1,10 +1,15 @@
 package com.dabing.planabc.controller;
 
+import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.dabing.planabc.dto.Result;
+import com.dabing.planabc.dto.UserDTO;
+import com.dabing.planabc.entity.Blog;
 import com.dabing.planabc.service.BlogService;
+import com.dabing.planabc.utils.UserHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 @RestController
 @RequestMapping("/blog")
@@ -38,5 +43,13 @@ public class BlogController {
     @GetMapping("/likes/{id}")
     public Result queryBlogLikes(@PathVariable("id") Long id){
         return Result.ok();
+    }
+
+    @GetMapping("/of/me")
+    public Result queryBlogs(){
+        UserDTO userDTO = UserHolder.getUser();
+        Long userId = userDTO.getId();
+        List<Blog> blogs = blogService.query().eq("user_id", userId).list();
+        return Result.ok(blogs);
     }
 }

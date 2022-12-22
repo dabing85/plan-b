@@ -1,13 +1,14 @@
 package com.dabing.planabc.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.dabing.planabc.dto.LoginFormDTO;
 import com.dabing.planabc.dto.Result;
+import com.dabing.planabc.dto.UserDTO;
+import com.dabing.planabc.entity.User;
 import com.dabing.planabc.service.UserService;
 import com.dabing.planabc.utils.RegexUtils;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.dabing.planabc.utils.UserHolder;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
@@ -26,5 +27,27 @@ public class UserController {
     @RequestMapping("/login")
     public Result login(@RequestBody LoginFormDTO loginFormDto,HttpSession session){
         return userService.login(loginFormDto,session);
+    }
+
+    /**
+     * 校验用户登录状态
+     * @return
+     */
+    @GetMapping("/me")
+    public Result me(){
+        //获取用户登录状态并返回
+        UserDTO userDTO = UserHolder.getUser();
+        return Result.ok(userDTO);
+    }
+
+
+    @GetMapping("/info/{id}")
+    public Result getUserInfo(@PathVariable("id") Long id ){
+        User user = userService.getById(id);
+        if(user==null){
+            return Result.ok();
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        return Result.ok(userDTO);
     }
 }
