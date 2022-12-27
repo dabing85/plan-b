@@ -1,19 +1,30 @@
 package com.dabing.planabc.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
-import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dabing.planabc.dto.LoginFormDTO;
 import com.dabing.planabc.dto.Result;
+import com.dabing.planabc.dto.UserDTO;
 import com.dabing.planabc.entity.User;
 import com.dabing.planabc.mapper.UserMapper;
 import com.dabing.planabc.service.UserService;
 import com.dabing.planabc.utils.RegexUtils;
 import com.dabing.planabc.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import static com.dabing.planabc.utils.RedisConstants.*;
 
 /**
 * @author 22616
@@ -25,6 +36,9 @@ import javax.servlet.http.HttpSession;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService {
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     @Override
     public Result sendCode(String phone, HttpSession session) {
         //1.判断手机号是否有效
@@ -35,7 +49,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String code = RandomUtil.randomNumbers(6);
 
         //3.保存随机码到session
-        session.setAttribute("code",code);
+        //session.setAttribute("code",code);
+        //修改为 - 保存到redis中，key为 login:code+手机号码 并设置有效期2分钟
+        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY+phone,code,LOGIN_CODE_TTL, TimeUnit.MINUTES);
 
         //4.发送随机码到用户手机
         log.debug("发送短信验证码成功，验证码：{}", code);
@@ -51,8 +67,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         //2.校验验证码是否正确
         String code = loginFormDto.getCode();
-        String sessionCode = (String)session.getAttribute("code");
-        if(!sessionCode.equals(code)){
+        //String sessionCode = (String)session.getAttribute("code");
+        //改为从redis获取验证码
+        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+        if(!cacheCode.equals(code)){
             return Result.fail("验证码错误！");
         }
         //3.查询数据库是否有该用户
@@ -63,8 +81,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
 
         //4.登录并保存用户信息到session
-        session.setAttribute("user",user);
-        return Result.ok();
+        //session.setAttribute("user",user);
+        //改为存储到redis中 ，key = login:token:随机码
+        //4.1 生成随机token ，作为登录令牌
+        String token = UUID.randomUUID().toString(true);
+        //4.2 将user对象转换为hashmap对象
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Map<String, Object> map = BeanUtil.beanToMap(userDTO, new HashMap<>(),
+                CopyOptions.create()
+                        .setIgnoreNullValue(true)
+                        .setFieldValueEditor((fieldName,fieldValue)-> fieldValue.toString()));
+        System.out.println("用户信息： " + map);
+        //4.3 讲hashMap对象保存到redis
+        String key = LOGIN_USER_KEY+token;
+        stringRedisTemplate.opsForHash().putAll(key,map);
+        //4.4 设置有效期
+        stringRedisTemplate.expire(key,LOGIN_USER_TTL,TimeUnit.MINUTES);
+        //返回token
+        return Result.ok(token);
     }
 
     /**
