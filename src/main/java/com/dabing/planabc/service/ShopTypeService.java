@@ -1,6 +1,7 @@
 package com.dabing.planabc.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.ShopType;
 
 /**
@@ -10,4 +11,5 @@ import com.dabing.planabc.entity.ShopType;
 */
 public interface ShopTypeService extends IService<ShopType> {
 
+    Result queryTypeList();
 }

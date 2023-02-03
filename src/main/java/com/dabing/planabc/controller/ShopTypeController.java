@@ -18,9 +18,12 @@ public class ShopTypeController {
 
     @GetMapping("/list")
     public Result queryTypeList() {
-        List<ShopType> typeList = shopTypeService
-                .query().orderByAsc("sort").list();
-        return Result.ok(typeList);
+//        List<ShopType> typeList = shopTypeService
+//                .query().orderByAsc("sort").list();
+//        return Result.ok(typeList);
+
+        //使用缓存 这里仍然使用String类型 因为任何对象都可以转换成string类型
+        return shopTypeService.queryTypeList();
     }
 
 
