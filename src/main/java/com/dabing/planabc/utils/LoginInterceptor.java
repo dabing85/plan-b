@@ -22,6 +22,7 @@ import static com.dabing.planabc.utils.RedisConstants.LOGIN_USER_TTL;
 public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        System.out.println("执行了登录拦截器");
         //1.从ThreadLocal中获取用户
         if(UserHolder.getUser()==null){
             //2.不存在 拦截

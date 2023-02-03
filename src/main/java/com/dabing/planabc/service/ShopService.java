@@ -12,4 +12,6 @@ import com.dabing.planabc.entity.Shop;
 public interface ShopService extends IService<Shop> {
 
     Result queryShopByType(Integer typeId, Integer current);
+
+    Result queryShopById(Long id);
 }
