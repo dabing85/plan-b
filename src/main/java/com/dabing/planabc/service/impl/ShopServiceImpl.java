@@ -9,8 +9,11 @@ import com.dabing.planabc.mapper.ShopMapper;
 import com.dabing.planabc.service.ShopService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.dabing.planabc.utils.RedisConstants.*;
 
@@ -49,9 +52,26 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
             //5.数据库不存在 返回错误
             return Result.fail("店铺不存在");
         }
-        //6.数据库存在 写入redis 返回数据
-        stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop));
+        //6.数据库存在 写入redis，添加60分钟的超时时间 返回数据
+        stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),CACHE_SHOP_TTL, TimeUnit.MINUTES);
         return Result.ok(shop);
+    }
+
+    /**
+     * 缓存更新策略：先更新数据库，再删除缓存
+     */
+    @Override
+    @Transactional
+    public Result updateShop(Shop shop) {
+        if(shop == null){
+            return Result.fail("店铺信息不能为空！");
+        }
+        //1.更新数据库
+        updateById(shop);
+
+        //2.删除缓存
+        stringRedisTemplate.delete(CACHE_SHOP_KEY+shop.getId());
+        return Result.ok();
     }
 }
 

@@ -39,4 +39,14 @@ public class ShopController {
     public Result queryShopById(@PathVariable("id")Long id){
         return shopService.queryShopById(id);
     }
+
+    /**
+     * 更新店铺信息 - 删除缓存
+     * @param shop
+     * @return
+     */
+    @PutMapping
+    public Result updateShop(@RequestBody Shop shop){
+        return shopService.updateShop(shop);
+    }
 }

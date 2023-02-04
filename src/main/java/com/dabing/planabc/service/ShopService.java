@@ -14,4 +14,6 @@ public interface ShopService extends IService<Shop> {
     Result queryShopByType(Integer typeId, Integer current);
 
     Result queryShopById(Long id);
+
+    Result updateShop(Shop shop);
 }
