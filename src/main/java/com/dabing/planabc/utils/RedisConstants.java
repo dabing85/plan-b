@@ -8,5 +8,8 @@ public class RedisConstants {
     public static final String CACHE_SHOP_KEY="cache:shop:";    //店铺缓存
     public static final long CACHE_SHOP_TTL=60L;
     public static final long CACHE_NULL_TTL=2L;
+    public static final String LOCK_SHOP_KEY="lock:shop:";    //店铺互斥锁
+    public static final long LOCK_SHOP_TTL=10L;               //互斥锁有效10秒
+
 
 }

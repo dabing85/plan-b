@@ -15,5 +15,10 @@ public interface ShopService extends IService<Shop> {
 
     Result queryShopById(Long id);
 
+    /**
+     * 基于互斥锁方式解决缓存击穿问题
+     */
+    Result queryShopHCJCByLock(Long id);
+
     Result updateShop(Shop shop);
 }
