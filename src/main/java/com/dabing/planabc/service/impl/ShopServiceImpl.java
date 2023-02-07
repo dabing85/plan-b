@@ -2,18 +2,23 @@ package com.dabing.planabc.service.impl;
 
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.Shop;
 import com.dabing.planabc.mapper.ShopMapper;
 import com.dabing.planabc.service.ShopService;
+import com.dabing.planabc.utils.RedisData;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 
+import java.time.LocalDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.dabing.planabc.utils.RedisConstants.*;
@@ -28,6 +33,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
     implements ShopService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    /**
+     * 创建线程池
+     */
+    private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     @Override
     public Result queryShopByType(Integer typeId, Integer current) {
@@ -121,6 +131,66 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
         return Result.ok(shop);
     }
 
+
+    /**
+     * 解决缓存击穿问题 - 基于逻辑过期
+     * 热点key问题，要事先将key存储到缓存，没有过期时间，因此永远都会命中，如果不命中，则证明不是热点key。
+     * 但是有逻辑过期时间，这个逻辑过期时间需要额外借助一个自定义类RedisData，该类属性是对应的店铺对象和逻辑过期时间
+     */
+    @Override
+    public Result queryShopHCJCByLogicalExpire(Long id) {
+        String key=CACHE_SHOP_KEY+id;
+        //1. 从redis查询商铺缓存
+        String DataJson=stringRedisTemplate.opsForValue().get(key);
+
+        //2. 判断是否命中
+        if(!StrUtil.isNotBlank(DataJson)){
+            //3.未命中 返回空
+            return Result.fail("非热点key");
+        }
+        //4.命中 判断是否过期
+        //解决缓存击穿问题 - 基于逻辑过期
+        RedisData redisData = JSONUtil.toBean(DataJson, RedisData.class);
+        LocalDateTime expireTime = redisData.getExpireTime();
+        //TODO 验证这样直接对象强转行不行
+        //JSONObject不能直接强转成Shop会报错
+        JSONObject jsonObject = (JSONObject) redisData.getData();
+        Shop shop = JSONUtil.toBean(jsonObject, Shop.class);
+        if(LocalDateTime.now().isBefore(expireTime)){
+            //未过期 直接返回数据
+            return Result.ok(shop);
+        }
+
+        //5 已过期 获取互斥锁
+        String lockKey=LOCK_SHOP_KEY+id;
+        boolean flag = tryLock(lockKey);
+        //不管是否获取到锁，都会返回旧数据
+        //获取到锁，开启独立线程，进行缓存重建
+        if(flag){
+            //二次判断是否过期
+            String DataJson2=stringRedisTemplate.opsForValue().get(key);
+            RedisData redisData2 = JSONUtil.toBean(DataJson2, RedisData.class);
+            LocalDateTime expireTime2 = redisData2.getExpireTime();
+            if(LocalDateTime.now().isBefore(expireTime2)){
+                //未过期 直接返回数据
+                return Result.ok(shop);
+            }
+            //开启线程
+            CACHE_REBUILD_EXECUTOR.submit(()->{
+                try {
+                    //重建缓存
+                    saveShop2Cache(id);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    //释放锁
+                    unLock(lockKey);
+                }
+            });
+        }
+        return Result.ok(shop);
+    }
+
     /**
      * 获取互斥锁
      */
@@ -151,6 +221,19 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
         //2.删除缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY+shop.getId());
         return Result.ok();
+    }
+
+    /**
+     * 将热点店铺保存到缓存
+     */
+    public void saveShop2Cache(Long id){
+        String key=CACHE_SHOP_KEY+id;
+        Shop shop = getById(id);
+        RedisData redisData = new RedisData();
+        redisData.setData(shop);
+        redisData.setExpireTime(LocalDateTime.now().plusSeconds(10)); //存入10秒后逻辑过期
+        String jsonStr = JSONUtil.toJsonStr(redisData);
+        stringRedisTemplate.opsForValue().set(key,jsonStr);
     }
 }
 
