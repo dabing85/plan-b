@@ -9,6 +9,7 @@ import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.Shop;
 import com.dabing.planabc.mapper.ShopMapper;
 import com.dabing.planabc.service.ShopService;
+import com.dabing.planabc.utils.RedisClient;
 import com.dabing.planabc.utils.RedisData;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private RedisClient redisClient;
+
     /**
      * 创建线程池
      */
@@ -46,34 +50,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop>
 
     @Override
     public Result queryShopById(Long id) {
-        String key=CACHE_SHOP_KEY+id;
-        //1. 从redis查询商铺缓存
-        //前面用户信息用了hash类型，这里试试string类型
-        String shopJson=stringRedisTemplate.opsForValue().get(key);
 
-        //2. 判断是否存在 "", null ,"/t/n"都是false "abc"才是true
-        if(StrUtil.isNotBlank(shopJson)){
-            //3.存在 返回数据
-            Shop shop = JSONUtil.toBean(shopJson, Shop.class);
-            return Result.ok(shop);
-        }
-        //判断是否是空值 此时shopJson可能是 "", null ,"/t/n"三种情况
-        if(shopJson != null ){
-            //此时shopJson=="" 是我们缓存的空对象
-            return Result.fail("店铺信息不存在！");
-        }
-        //4.此时shopJson为null 查询数据库
-        Shop shop=getById(id);
-        if(shop == null){
-            //5.数据库不存在 返回错误
-            //缓存空对象 2分钟超时
-            stringRedisTemplate.opsForValue().set(key,"",CACHE_NULL_TTL,TimeUnit.MINUTES);
-            return Result.fail("店铺不存在");
-        }
-        //6.数据库存在 写入redis，添加60分钟的超时时间 返回数据
-        stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        //缓存穿透
+        Shop shop = redisClient.queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+
+        //逻辑过期解决缓存击穿
+        //Shop shop = redisClient.queryWithLogicExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, LOCK_SHOP_TTL, TimeUnit.SECONDS);
+        //互斥锁解决缓存击穿
+        //Shop shop = redisClient.queryWithMutex(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
         return Result.ok(shop);
     }
+
 
     /**
      * 解决缓存击穿问题 - 基于互斥锁
