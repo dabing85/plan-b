@@ -1,6 +1,7 @@
 package com.dabing.planabc.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.Voucher;
 
 /**
@@ -10,4 +11,7 @@ import com.dabing.planabc.entity.Voucher;
 */
 public interface VoucherService extends IService<Voucher> {
 
+    Result addSeckillVoucher(Voucher voucher);
+
+    Result queryVoucherByShopId(Long shopId);
 }

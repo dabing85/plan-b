@@ -3,6 +3,8 @@ package com.dabing.planabc.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.dabing.planabc.entity.Voucher;
 
+import java.util.List;
+
 /**
 * @author 22616
 * @description 针对表【tb_voucher】的数据库操作Mapper
@@ -11,6 +13,7 @@ import com.dabing.planabc.entity.Voucher;
 */
 public interface VoucherMapper extends BaseMapper<Voucher> {
 
+    List<Voucher> queryVoucherByShopId(Long shopId);
 }
 
 

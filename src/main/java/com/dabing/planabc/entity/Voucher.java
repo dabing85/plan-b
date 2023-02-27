@@ -72,6 +72,25 @@ public class Voucher implements Serializable {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 库存
+     */
+    @TableField(exist = false)
+    private Integer stock;
+
+
+    /**
+     * 生效时间
+     */
+    @TableField(exist = false)
+    private LocalDateTime beginTime;
+
+    /**
+     * 失效时间
+     */
+    @TableField(exist = false)
+    private LocalDateTime endTime;
+
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 }

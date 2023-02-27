@@ -16,7 +16,18 @@
             <result property="status" column="status" jdbcType="TINYINT"/>
             <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+            <result property="stock" column="stock" jdbcType="TINYINT"/>
+            <result property="beginTime" column="begin_time" jdbcType="TIMESTAMP"/>
+            <result property="endTime" column="end_time" jdbcType="TIMESTAMP"/>
     </resultMap>
+
+    <select id="queryVoucherByShopId" resultMap="BaseResultMap" parameterType="java.lang.Long">
+        select v.id,v.shop_id,v.title,v.sub_title,v.rules,v.pay_value,v.actual_value,v.type,
+               v.status,v.create_time,v.update_time,sv.stock,sv.begin_time,sv.end_time
+        from tb_voucher v
+        left join tb_seckill_voucher sv on v.id = sv.voucher_id
+        where v.shop_id=#{shopId} and v.status=1
+    </select>
 
     <sql id="Base_Column_List">
         id,shop_id,title,
