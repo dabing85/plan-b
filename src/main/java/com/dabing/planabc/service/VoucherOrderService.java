@@ -12,4 +12,6 @@ import com.dabing.planabc.entity.VoucherOrder;
 public interface VoucherOrderService extends IService<VoucherOrder> {
 
     Result seckillVoucher(Long voucherId);
+
+    Result createVoucherOrder(Long voucherId);
 }

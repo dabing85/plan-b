@@ -9,7 +9,9 @@ import com.dabing.planabc.service.SeckillVoucherService;
 import com.dabing.planabc.service.VoucherOrderService;
 import com.dabing.planabc.utils.RedisIDWorker;
 import com.dabing.planabc.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
@@ -43,13 +45,32 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if(seckillVoucher.getStock() < 1){
             return Result.fail("库存不足！");
         }
-        //4. 开始下单
-        //4.1 库存-1
+        //4. 创建订单
+        Long userId = UserHolder.getUser().getId();
+        //仅锁user对象
+        synchronized (userId.toString().intern()){
+            //事务失效 获取代理对象（事务）
+            VoucherOrderService proxy = (VoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        }
+    }
+
+    @Transactional
+    public Result createVoucherOrder(Long voucherId){
+        //4. 一人一单
+        Long userId = UserHolder.getUser().getId();
+        int count = query().eq("voucher_id", voucherId).eq("user_id", userId).count();
+        if(count > 0){
+            return Result.fail("用户已经购买过一次！");
+        }
+
+        //5. 开始下单
+        //5.1 库存-1
         boolean success = seckillVoucherService.update()
                 .setSql("stock = stock -1 ")    //set stock = stock-1
                 .eq("voucher_id", voucherId).gt("stock",0) //where id=? and stock > 0
                 .update();
-        //4.2 生成订单
+        //5.2 生成订单
         if(!success){
             return Result.fail("库存不足！");
         }
@@ -63,7 +84,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setVoucherId(voucherId);
         //4.保存订单
         save(voucherOrder);
-        //5. 返回订单号
+        //6. 返回订单号
         return Result.ok(orderId);
     }
 }
