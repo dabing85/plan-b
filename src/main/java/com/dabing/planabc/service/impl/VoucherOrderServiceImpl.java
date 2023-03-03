@@ -8,13 +8,16 @@ import com.dabing.planabc.mapper.VoucherOrderMapper;
 import com.dabing.planabc.service.SeckillVoucherService;
 import com.dabing.planabc.service.VoucherOrderService;
 import com.dabing.planabc.utils.RedisIDWorker;
+import com.dabing.planabc.utils.SimpleRedisLock;
 import com.dabing.planabc.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
 * @author 22616
@@ -29,6 +32,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private SeckillVoucherService seckillVoucherService;
     @Resource
     private RedisIDWorker redisIDWorker;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -48,10 +53,25 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         //4. 创建订单
         Long userId = UserHolder.getUser().getId();
         //仅锁user对象
-        synchronized (userId.toString().intern()){
-            //事务失效 获取代理对象（事务）
+//        synchronized (userId.toString().intern()){
+//            //事务失效 获取代理对象（事务）
+//            VoucherOrderService proxy = (VoucherOrderService) AopContext.currentProxy();
+//            return proxy.createVoucherOrder(voucherId);
+//        }
+        //不使用synchronized上锁
+        //使用分布式锁
+        SimpleRedisLock simpleRedisLock=new SimpleRedisLock("order:"+userId,stringRedisTemplate);
+        boolean isLock = simpleRedisLock.tryLock(10l, TimeUnit.SECONDS);//10秒送自动释放锁
+        if(!isLock){
+            return Result.fail("限制一人一单！");
+        }
+        try {
+            //调用本类方法，事务失效
+            //获取代理对象（事务）
             VoucherOrderService proxy = (VoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
+        } finally {
+            simpleRedisLock.unLock();
         }
     }
 
