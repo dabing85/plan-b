@@ -10,6 +10,8 @@ import com.dabing.planabc.service.VoucherOrderService;
 import com.dabing.planabc.utils.RedisIDWorker;
 import com.dabing.planabc.utils.SimpleRedisLock;
 import com.dabing.planabc.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -34,9 +36,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIDWorker redisIDWorker;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
-    public Result seckillVoucher(Long voucherId) {
+    public Result seckillVoucher(Long voucherId){
         SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
         //1. 判断秒杀是否开始
         if(seckillVoucher.getBeginTime().isAfter(LocalDateTime.now())){
@@ -60,8 +64,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //        }
         //不使用synchronized上锁
         //使用分布式锁
-        SimpleRedisLock simpleRedisLock=new SimpleRedisLock("order:"+userId,stringRedisTemplate);
-        boolean isLock = simpleRedisLock.tryLock(10l, TimeUnit.SECONDS);//10秒送自动释放锁
+//        SimpleRedisLock simpleRedisLock=new SimpleRedisLock("order:"+userId,stringRedisTemplate);
+//        boolean isLock = simpleRedisLock.tryLock(10l, TimeUnit.SECONDS);//10秒送自动释放锁
+
+        //使用redisson
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        boolean isLock = lock.tryLock();
+
+
         if(!isLock){
             return Result.fail("限制一人一单！");
         }
@@ -71,7 +81,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             VoucherOrderService proxy = (VoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
         } finally {
-            simpleRedisLock.unLock();
+//            simpleRedisLock.unLock();
+            lock.unlock();
         }
     }
 
