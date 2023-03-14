@@ -10,6 +10,7 @@ public class RedisConstants {
     public static final long CACHE_NULL_TTL=2L;
     public static final String LOCK_SHOP_KEY="lock:shop:";    //店铺互斥锁
     public static final long LOCK_SHOP_TTL=10L;               //互斥锁有效10秒
+    public static final String SECKILL_STOCK_KEY="seckill:stock:";
 
 
 }

@@ -7,12 +7,15 @@ import com.dabing.planabc.entity.Voucher;
 import com.dabing.planabc.mapper.VoucherMapper;
 import com.dabing.planabc.service.SeckillVoucherService;
 import com.dabing.planabc.service.VoucherService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.dabing.planabc.utils.RedisConstants.SECKILL_STOCK_KEY;
 
 /**
 * @author 22616
@@ -25,6 +28,8 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
 
     @Resource
     private SeckillVoucherService seckillVoucherService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result addSeckillVoucher(Voucher voucher) {
@@ -37,6 +42,8 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
         seckillVoucher.setCreateTime(voucher.getCreateTime());
         seckillVoucher.setUpdateTime(voucher.getUpdateTime());
         seckillVoucherService.save(seckillVoucher);
+        //同时保存秒杀信息到redis中
+        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY+voucher.getId(),voucher.getStock().toString());
         return Result.ok(voucher.getId());
     }
 
