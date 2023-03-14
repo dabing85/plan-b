@@ -1,5 +1,6 @@
 package com.dabing.planabc.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.VoucherOrder;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -19,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -63,14 +68,66 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             public void run() {
                 while(true){
                     try {
-                        VoucherOrder voucherOrder=ordersTask.take(); //获取阻塞队列的头部元素，没有则等待
+//                        VoucherOrder voucherOrder=ordersTask.take(); //获取阻塞队列的头部元素，没有则等待
+                        String queueName="stream.orders";
+                        //不使用堵塞队列，使用stream消息队列
+                        //1.从消费组从未读取消息开始读取  XREADGROUP GROUP g1 c1 COUNT 1 BLOCK 2000 STREAMS stream.orders >
+                        List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(Consumer.from("g1", "c1"),
+                                StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+                                StreamOffset.create(queueName, ReadOffset.lastConsumed()));
+                        //2.读取为空，阻塞
+                        if(list==null || list.isEmpty()){
+                            //null，说明没有消息，继续下一次循环
+                            continue;
+                        }
+                        //解析数据
+                        MapRecord<String, Object, Object> record = list.get(0);
+                        Map<Object, Object> value = record.getValue();
+                        VoucherOrder voucherOrder= BeanUtil.fillBeanWithMap(value,new VoucherOrder(),true);
+                        //3.不为空，处理订单
                         proxy.createVoucherOrder(voucherOrder);
+                        //4.确认消息
+                        stringRedisTemplate.opsForStream().acknowledge("s1","g1",record.getId());
                     } catch (Exception e) {
                         log.error("处理订单异常",e);
+                        //异常，从pending-list中读取未成功处理的消息
+                        handlePendingList();
                     }
                 }
             }
         });
+    }
+
+    private void handlePendingList() {
+        try {
+            while (true){
+                String queueName="stream.orders";
+                //1.从消费组从未读取消息开始读取  XREADGROUP GROUP g1 c1 COUNT 1 STREAMS stream.orders 0
+                List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(Consumer.from("g1", "c1"),
+                        StreamReadOptions.empty().count(1),
+                        StreamOffset.create(queueName, ReadOffset.from("0")));
+                //2.读取为空，阻塞
+                if(list==null || list.isEmpty()){
+                    //null，说明没有未取消的消息，结束循环
+                    break;
+                }
+                //解析数据
+                MapRecord<String, Object, Object> record = list.get(0);
+                Map<Object, Object> value = record.getValue();
+                VoucherOrder voucherOrder= BeanUtil.fillBeanWithMap(value,new VoucherOrder(),true);
+                //3.不为空，处理订单
+                proxy.createVoucherOrder(voucherOrder);
+                //4.确认消息 XACK
+                stringRedisTemplate.opsForStream().acknowledge("s1","g1",record.getId());
+            }
+        } catch (Exception e) {
+            log.error("处理pendding订单异常", e);
+            try{
+                Thread.sleep(20);
+            }catch(Exception ex){
+                ex.printStackTrace();
+            }
+        }
     }
 
     private VoucherOrderService proxy;
@@ -78,8 +135,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     public Result seckillVoucher(Long voucherId){
         //1.执行lua脚本
         Long userId = UserHolder.getUser().getId();
+        long orderId = redisIDWorker.nextId("order");
         Long result = stringRedisTemplate.execute(SECKILL_SCRIPT, Collections.emptyList(),
-                voucherId.toString(), userId.toString());
+                voucherId.toString(), userId.toString(),String.valueOf(orderId));
         //2.判断结果是否为0
         int i = result.intValue();
         //3.结果不为0
@@ -87,18 +145,20 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail( i==1 ? "库存不足":"请勿重复下单");
         }
         //4.结果为0
-        long orderId = redisIDWorker.nextId("order");
+
         //TODO 5.将用户、优惠券信息等保存到阻塞队列中
-        VoucherOrder voucherOrder = new VoucherOrder();
-        //5.1.订单id
-        voucherOrder.setId(orderId);
-        //5.2.用户id
-        voucherOrder.setUserId(userId);
-        //5.3.优惠券id
-        voucherOrder.setVoucherId(voucherId);
-        //5.4.保存订单信息到阻塞队列
-        ordersTask.add(voucherOrder);
-        //获取代理，用户开启下订单事务
+        //不使用阻塞队列了，使用stream消息队列,lua已经完成该操作
+
+//        VoucherOrder voucherOrder = new VoucherOrder();
+//        //5.1.订单id
+//        voucherOrder.setId(orderId);
+//        //5.2.用户id
+//        voucherOrder.setUserId(userId);
+//        //5.3.优惠券id
+//        voucherOrder.setVoucherId(voucherId);
+//        //5.4.保存订单信息到阻塞队列
+//        ordersTask.add(voucherOrder);
+//        //获取代理，用户开启下订单事务
         proxy = (VoucherOrderService) AopContext.currentProxy();
         return Result.ok(orderId);
     }
