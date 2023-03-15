@@ -1,6 +1,7 @@
 package com.dabing.planabc.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.entity.Follow;
 
 /**
@@ -10,4 +11,7 @@ import com.dabing.planabc.entity.Follow;
 */
 public interface FollowService extends IService<Follow> {
 
+    Result follow(Long id, Boolean isFollow);
+
+    Result isFollow(Long id);
 }
