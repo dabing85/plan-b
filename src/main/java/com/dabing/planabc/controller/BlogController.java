@@ -53,9 +53,12 @@ public class BlogController {
         return blogService.likeBlog(id);
     }
 
+    /**
+     * 查询博客的点赞情况
+     */
     @GetMapping("/likes/{id}")
     public Result queryBlogLikes(@PathVariable("id") Long id){
-        return Result.ok();
+        return blogService.queryBlogLikes(id);
     }
 
     @GetMapping("/of/me")
