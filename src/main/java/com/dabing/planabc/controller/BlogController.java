@@ -45,12 +45,12 @@ public class BlogController {
         return blogService.queryBlogById(id);
     }
 
-
-    @GetMapping("/like/{id}")
+    /**
+     * 点赞博客
+     */
+    @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id){
-        blogService.update()
-                .setSql("liked=liked+1").eq("id",id).update();
-        return Result.ok();
+        return blogService.likeBlog(id);
     }
 
     @GetMapping("/likes/{id}")

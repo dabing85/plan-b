@@ -11,6 +11,7 @@ public class RedisConstants {
     public static final String LOCK_SHOP_KEY="lock:shop:";    //店铺互斥锁
     public static final long LOCK_SHOP_TTL=10L;               //互斥锁有效10秒
     public static final String SECKILL_STOCK_KEY="seckill:stock:";
+    public static final String BLOG_LIKE_KEY="blog:liked:";   //笔记点赞用户set集合
 
 
 }
