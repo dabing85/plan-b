@@ -24,13 +24,7 @@ public class BlogController {
      */
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
-        Long userId = UserHolder.getUser().getId();
-        blog.setUserId(userId);
-        boolean isSuccess = blogService.save(blog);
-        if(isSuccess)
-            return Result.ok();
-        else
-            return Result.fail("发布笔记失败");
+        return blogService.saveBlog(blog);
     }
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current",defaultValue = "1") Integer current){

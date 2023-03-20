@@ -18,4 +18,6 @@ public interface BlogService extends IService<Blog> {
     Result likeBlog(Long id);
 
     Result queryBlogLikes(Long id);
+
+    Result saveBlog(Blog blog);
 }

@@ -8,9 +8,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dabing.planabc.dto.Result;
 import com.dabing.planabc.dto.UserDTO;
 import com.dabing.planabc.entity.Blog;
+import com.dabing.planabc.entity.Follow;
 import com.dabing.planabc.entity.User;
 import com.dabing.planabc.mapper.BlogMapper;
 import com.dabing.planabc.service.BlogService;
+import com.dabing.planabc.service.FollowService;
 import com.dabing.planabc.service.UserService;
 import com.dabing.planabc.utils.SystemConstants;
 import com.dabing.planabc.utils.UserHolder;
@@ -35,6 +37,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog>
     implements BlogService {
     @Resource
     private UserService userService;
+    @Resource
+    private FollowService followService;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
@@ -120,6 +124,26 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog>
         //读取数据中的用户信息并返回
         List<UserDTO> userDTOS = users.stream().map(user -> BeanUtil.copyProperties(user, UserDTO.class)).collect(Collectors.toList());
         return Result.ok(userDTOS);
+    }
+
+    /**
+     * 保存笔记的时候使用feed流推模式把笔记保存到粉丝的收件箱中，使用zset结构保存数据
+     */
+    @Override
+    public Result saveBlog(Blog blog) {
+        Long userId = UserHolder.getUser().getId();
+        blog.setUserId(userId);
+        boolean isSuccess = save(blog);
+        if(!isSuccess)
+            return Result.fail("发布笔记失败");
+        //查询粉丝
+        List<Follow> fans = followService.query().eq("follow_user_id", userId).list();
+        for(Follow fan:fans){
+            //保存博客到粉丝的收件箱
+            String key="feed:"+fan.getUserId();
+            stringRedisTemplate.opsForZSet().add(key,blog.getId().toString(),System.currentTimeMillis());
+        }
+        return Result.ok(blog.getId());
     }
 
     /**
