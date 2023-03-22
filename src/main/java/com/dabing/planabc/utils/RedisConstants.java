@@ -13,7 +13,7 @@ public class RedisConstants {
     public static final String SECKILL_STOCK_KEY="seckill:stock:";
     public static final String BLOG_LIKE_KEY="blog:liked:";   //笔记点赞用户set集合
     public static final String FEED_KEY="feed:";               //关注用户的blog数据 zset集合
-
+    public static final String SHOP_GEO_KEY = "shop:geo:";
 
 
 }
