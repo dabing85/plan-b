@@ -1,8 +1,13 @@
 package com.dabing.planabc;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.dabing.planabc.dto.Result;
+import com.dabing.planabc.entity.Blog;
 import com.dabing.planabc.entity.Shop;
+import com.dabing.planabc.service.BlogService;
 import com.dabing.planabc.service.impl.ShopServiceImpl;
 import com.dabing.planabc.utils.RedisIDWorker;
+import com.dabing.planabc.utils.SystemConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.geo.Point;
@@ -35,6 +40,8 @@ public class PlanABCTest {
     private RedisIDWorker redisIDWorker;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private BlogService blogService;
     @Test
     public void saveShop2CacheTest(){
         shopService.saveShop2Cache(1l);
@@ -95,5 +102,19 @@ public class PlanABCTest {
             }
             stringRedisTemplate.opsForGeo().add(key, locations);
         }
+    }
+
+    /**
+     * 测试分页查询
+     */
+    @Test
+    public void testPageSelect(){
+        //根据点赞数查询当前页数据
+        Page<Blog> page = blogService.query()
+                .orderByDesc("liked")
+                .page(new Page<>(1, SystemConstants.MAX_PAGE_SIZE));
+        //获取当前页数据
+        List<Blog> records = page.getRecords();
+        records.forEach(record -> System.out.println(record.getId()));
     }
 }
