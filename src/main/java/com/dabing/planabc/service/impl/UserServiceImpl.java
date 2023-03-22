@@ -13,6 +13,7 @@ import com.dabing.planabc.mapper.UserMapper;
 import com.dabing.planabc.service.UserService;
 import com.dabing.planabc.utils.RegexUtils;
 import com.dabing.planabc.utils.SystemConstants;
+import com.dabing.planabc.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -99,6 +102,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         stringRedisTemplate.expire(key,LOGIN_USER_TTL,TimeUnit.MINUTES);
         //返回token
         return Result.ok(token);
+    }
+
+    @Override
+    public Result sign() {
+        //1. 获取当前用户
+        Long userId = UserHolder.getUser().getId();
+        //2. 获取当天日期信息
+        LocalDateTime now = LocalDateTime.now();
+        String month= now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        //3. 拼接key
+        String key = SIGN_USER_KEY+userId+month;
+        //4. 获取当天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //5. 将签到信息保存到bitmap中 SETBIT key offset 1
+        stringRedisTemplate.opsForValue().setBit(key,dayOfMonth-1,true);
+        return Result.ok();
     }
 
     /**

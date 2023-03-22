@@ -17,4 +17,6 @@ public interface UserService extends IService<User> {
     Result sendCode(String phone, HttpSession session);
 
     Result login(LoginFormDTO loginFormDto, HttpSession session);
+
+    Result sign();
 }
