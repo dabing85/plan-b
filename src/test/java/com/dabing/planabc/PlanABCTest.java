@@ -117,4 +117,24 @@ public class PlanABCTest {
         List<Blog> records = page.getRecords();
         records.forEach(record -> System.out.println(record.getId()));
     }
+
+    /**
+     *  UV统计-测试百万数据的统计
+     */
+    @Test
+    public void testHyperLogLog(){
+        String[] values=new String[1000];
+        int j=0;
+        //存入一百万条不重复数据
+        for (int i = 0; i < 1000000; i++) {
+            j = i % 1000;
+            values[j]="user_"+i;
+            if(j==999){
+                stringRedisTemplate.opsForHyperLogLog().add("hll",values);
+            }
+        }
+        //统计数据
+        Long count = stringRedisTemplate.opsForHyperLogLog().size("hll");
+        System.out.println("count = " + count); //count = 997593   有2%的误差
+    }
 }
