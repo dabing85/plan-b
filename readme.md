@@ -4,7 +4,7 @@
 
 一个redis的练手项目
 
-github：
+github：github：https://github.com/dabing85/plan-b
 
 gitee：https://gitee.com/hedabing/plan-b.git
 
