@@ -15,6 +15,7 @@ import com.dabing.planabc.utils.RegexUtils;
 import com.dabing.planabc.utils.SystemConstants;
 import com.dabing.planabc.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ import javax.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -118,6 +120,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         //5. 将签到信息保存到bitmap中 SETBIT key offset 1
         stringRedisTemplate.opsForValue().setBit(key,dayOfMonth-1,true);
         return Result.ok();
+    }
+
+    @Override
+    public Result signCount() {
+        Long userId = UserHolder.getUser().getId();
+        //1.获取当天信息
+        LocalDateTime now = LocalDateTime.now();
+        String subPrefix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        //2.拼接key
+        String key=SIGN_USER_KEY+userId+subPrefix;
+        //3.获取当天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //4.获取本月到今天为止的所有签到数据？返回一个10进制数字  BITFIELD key GET u[dayOfMonth] 0
+        List<Long> result = stringRedisTemplate.opsForValue()
+                .bitField(key, BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth))
+                        .valueAt(0));
+        //5.遍历数据
+        if(result==null || result.isEmpty()){
+            //没有任何签到结果
+            return Result.ok(0);
+        }
+        Long num = result.get(0);
+        if(num == null || num==0){
+            return Result.ok(0);
+        }
+        int count=0;
+        while(true){
+            //从后往前遍历，跟1相与，判断是否为0
+            if((num & 1)==0){
+                //为0，返回结果
+                break;
+            }else {
+                //为1，count++
+                count++;
+            }
+            // 把数字右移一位，抛弃最后一个bit位，继续下一个bit位
+            num >>>= 1;
+        }
+
+        return Result.ok(count);
     }
 
     /**

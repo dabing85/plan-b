@@ -67,4 +67,12 @@ public class UserController {
     public Result sign(){
         return userService.sign();
     }
+
+    /**
+     * 本月连续签到的天数
+     */
+    @GetMapping("/sign/count")
+    public Result signCount(){
+        return userService.signCount();
+    }
 }
